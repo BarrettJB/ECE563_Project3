@@ -8,6 +8,16 @@
 #ifndef PIPELINE_H_
 #define PIPELINE_H_
 
+typedef struct instr {
+	bool valid;
+	unsigned long int pc;
+	unsigned int op_type;
+	int rd;
+	unsigned int r1;
+	unsigned int r2;
+	unsigned int robID;
+};
+
 typedef struct rob_entry{
 	int value;
 	unsigned int dst;
@@ -18,6 +28,8 @@ typedef struct rob_entry{
 };
 
 typedef struct iq_entry{
+	instr iqInstr;
+	int age;
 	bool valid;
 	unsigned int dstTag;
 	bool rs1Rdy;
@@ -31,17 +43,6 @@ typedef struct iq_entry{
 typedef struct rmt_entry {
 	bool valid;
 	unsigned int tag;
-};
-
-
-typedef struct instr {
-	bool valid;
-	unsigned long int pc;
-	unsigned int op_type;
-	int rd;
-	unsigned int r1;
-	unsigned int r2;
-	unsigned int robID;
 };
 
 typedef struct fu {
@@ -72,6 +73,8 @@ private:
 	unsigned int mHead;
 	unsigned int mTail;
 	iq_entry* mIQ;
+	unsigned int mIQsize;
+	unsigned int mIQentries;
 	rmt_entry* mRMT;
 
 
