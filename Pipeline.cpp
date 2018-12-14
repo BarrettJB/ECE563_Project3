@@ -43,23 +43,23 @@ Pipeline::Pipeline(unsigned long int width, unsigned long int iq_size, unsigned 
 }
 
 void Pipeline::retire(){
-	//update validation cycle counts
+	//update validation cycle counts for time spent in retire
 	for(int j = 0; j < mROBsize; j++) {
 		mROB[j].robInstr.rtDur++;
 	}
+
 	//Retire width ready instructions from the ROB
 	for(int i = 0; i < mWidth; i++) {
 		if(mROBentries == 0) { break; }
 		if (mROB[mHead].rdy) {
 
-			//Check if the RMT is from this
+			//Clear RMT if necessary
 			if(mRMT[mROB[mHead].dst].tag == mHead && mROB[mHead].dst != -1)
 			{
 				mRMT[mROB[mHead].dst].valid = false;
 			}
 
 			//Update anyone in iq
-			//Send wakeups into IQ
 			for(int k = 0; k < mIQsize; k++)
 			{
 				if( mHead == mIQ[k].iqInstr.rs1 && mIQ[k].iqInstr.rs1ROB)
@@ -72,7 +72,8 @@ void Pipeline::retire(){
 					mIQ[k].rs2Rdy = true;
 				}
 			}
-			//Tell renamed instruction this has retired
+
+			//Cover instructions that have been renamed but have not yet entered issue queue
 			for(int k = 0; k < mWidth; k++)
 			{
 				//Renamed instructions
@@ -105,10 +106,9 @@ void Pipeline::retire(){
 			//Move the head pointer
 			mHead = (mHead + 1) % mROBsize;
 			mROBentries--;
-			//printf("mHead: %d, mROBentries: %d \n", mHead, mROBentries);
 		}
 	}
-	//Pipeline is empty this is finished
+	//If the file has reached the end and the ROB is empty then the process is complete.
 	if (eof && mROBentries == 0) {
 		finished = true;
 	}
@@ -146,7 +146,6 @@ void Pipeline::writeback(){
 	}
 }
 
-//This was being worked on
 void Pipeline::execute(){
 	//Iterate through all instructions currently in ex stage
 	int j = 0;
@@ -234,7 +233,7 @@ void Pipeline::issue() {
 		while(!fuFound) {
 			//on finding a ready processor
 			if(!mFU[k].inUse){
-				//Set that we found a processor
+				//Set that it found a processor
 				fuFound = true;
 				//Give it the instruction
 				mFU[k].fuInstr = mIQ[oldest].iqInstr;
@@ -263,15 +262,16 @@ void Pipeline::issue() {
 }
 
 void Pipeline::dispatch() {
-	int i = 0;
 	//There are available slots in the issue queue
 	if(mIQentries+mWidth <= mIQsize) {
 		mDIStall = false;
 		for( int i = 0; i < mWidth; i++) {
 			//End the stage if there are no valid instructions left in the pipeline register
 			if (!mDIPR[i].valid){
+				//printf("previous stall invalidated the instructions this cycle\n");
 				return;
 			}
+			//Search for open IQ slot
 			for (int j = 0; j < mIQsize; j++) {
 				if (!mIQ[j].valid) {
 					//Insert instruction into instruction queue
@@ -336,6 +336,7 @@ void Pipeline::dispatch() {
 }
 
 void Pipeline::regRead() {
+	//if stalled just update cycle count
 	if(mDIStall) {
 		for(int i = 0; i < mWidth; i++) {
 			mRRPR[i].rrDur++;
@@ -352,7 +353,6 @@ void Pipeline::regRead() {
 }
 
 void Pipeline::rename() {
-	//printf("Decode: %d\n",mRNPR[0].traceLine);
 	//If IQ is full stall
 	if(mDIStall) {
 		for(int i = 0; i < mWidth; i++) {
@@ -374,6 +374,7 @@ void Pipeline::rename() {
 		return;
 	}
 
+	//No longer stalled
 	mRNStall = false;
 
 	//Allocate spot in ROB
@@ -410,16 +411,20 @@ void Pipeline::rename() {
 		}
 		else
 		{
+			//This means that the value comes from the ARF
+			//So it will be ready once this is dispatched into issue
 			mRNPR[i].rs1ROB = false;
 		}
 
 		if(mRNPR[i].rs2 != -1 && mRMT[mRNPR[i].rs2].valid)
 		{
+			//Get the ROB tag and set the flag that this is in the ROB
 			mRNPR[i].rs2 = mRMT[mRNPR[i].rs2].tag;
 			mRNPR[i].rs2ROB = true;
 		}
 		else
 		{
+			//This means that the value comes from the ARF
 			mRNPR[i].rs2ROB = false;
 		}
 
@@ -440,7 +445,6 @@ void Pipeline::rename() {
 }
 
 void Pipeline::decode() {
-	//printf("Decode: %d\n",mDEPR[0].traceLine);
 	//Increment cycle times if stalled
 	if (mDIStall || mRNStall)
 	{
@@ -458,9 +462,7 @@ void Pipeline::decode() {
 	}
 }
 
-//TODO handle bundles that are not full...
 void Pipeline::fetch(instr* input) {
-	//printf("Fetch: %d\n",input[0].traceLine);
 	//Do nothing if stalled
 	if (mDIStall || mRNStall)
 	{

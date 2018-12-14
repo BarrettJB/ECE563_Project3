@@ -64,20 +64,22 @@ int main (int argc, char* argv[])
 	{
 		//if file is empty or proccessor is stalled we need to send empty inputs
 		for (int i = 0; i < params.width; i++) {
+
 			//On stall don't update instruction
 			if(pl.isStalled()) {
-				//printf("needed to stall DI: %d  RN: %d cycle: %d\n",pl.mDIStall,pl.mRNStall,pl.cycle);
+				//On stall don't update instruction
 			}
 			else
 			{
+				//If trace file is empty send empty instructions
 				if(pl.eof) {
 					input = new instr[1];
 					input[i].valid = false;
 				}
 				else
 				{
+					//If the trace file is empty set the flags and send an empty instruction
 					if (fscanf(FP, "%lx %d %d %d %d", &pc, &op_type, &dest, &src1, &src2) == EOF) {
-						//printf("End of File Reached!\n");
 						pl.eof = true;
 						input = new instr[1];
 						input[i].valid = false;
@@ -99,28 +101,20 @@ int main (int argc, char* argv[])
 			}
 		}
 
-
-		//printf("  retire...\n");
+		//Go through steps of the pipe line
 		pl.retire();
-		//printf("  writeback...\n");
 		pl.writeback();
-		//printf("  execute...\n");
 		pl.execute();
-		//printf("  issue...\n");
 		pl.issue();
-		//printf("  dispatch...\n");
 		pl.dispatch();
-		//printf("  regRead...\n");
 		pl.regRead();
-		//printf("  rename...\n");
 		pl.rename();
-		//printf("  decode...\n");
 		pl.decode();
-		//printf("  fetch...\n");
 		pl.fetch(input);
 		pl.cycle++;
 	}
 
+	//Print out the stats of the pipeline
 	printf("# === Simulator Command =========\n");
 	printf("# ./sim %d %d %d %s\n", params.rob_size, params.iq_size, params.width, trace_file);
 	printf("# === Processor Configuration ===\n");
