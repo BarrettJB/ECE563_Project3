@@ -13,15 +13,17 @@ typedef struct instr {
 	unsigned long int pc;
 	unsigned int op_type;
 	int rd;
-	unsigned int r1;
-	unsigned int r2;
+	unsigned int rs1;
+	bool rs1ROB;
+	unsigned int rs2;
+	bool rs2ROB;
 	unsigned int robID;
 };
 
 typedef struct rob_entry{
-	int value;
-	unsigned int dst;
+	int dst;
 	bool rdy;
+	//These two may be unecessary
 	bool exc;
 	bool miss;
 	unsigned long int pc;
@@ -32,12 +34,8 @@ typedef struct iq_entry{
 	int age;
 	bool valid;
 	unsigned int dstTag;
-	bool rs1Rdy;
-	bool rs1ROB;
-	int rs1Val;
-	bool rs2Rdy;
-	bool rs2ROB;
-	int rs2Val;
+	bool *rs1Rdy;
+	bool *rs2Rdy;
 };
 
 typedef struct rmt_entry {
@@ -63,7 +61,7 @@ public:
 	void regRead();
 	void rename();
 	void decode();
-	void fetch();
+	void fetch(instr* input);
 
 private:
 	unsigned long int mWidth;
@@ -85,6 +83,13 @@ private:
 	instr* mDIPR;
 	fu* mFU;
 	instr* mWBPR;
+
+	//Used to stall early processes depending on availability
+	bool mDEStall;
+	bool mRNStall;
+
+	//Used for wakeup pointers
+	bool isTrue;
 };
 
 #endif /* PIPELINE_H_ */
