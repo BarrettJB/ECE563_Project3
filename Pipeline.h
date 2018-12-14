@@ -63,6 +63,10 @@ public:
 	void decode();
 	void fetch(instr* input);
 
+	//Used to end the process once all instructions retire
+	bool eof;
+	bool finished;
+
 private:
 	unsigned long int mWidth;
 	int* mARF;
@@ -90,6 +94,7 @@ private:
 
 	//Used for wakeup pointers
 	bool isTrue;
+
 };
 
 #endif /* PIPELINE_H_ */

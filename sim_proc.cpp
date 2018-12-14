@@ -42,7 +42,7 @@ int main (int argc, char* argv[])
     // Open trace_file in read mode
     */
     //FP = fopen(trace_file, "r");
-    FP = fopen("gcc_trace.txt", "r");
+    FP = fopen("test_trace.txt", "r");
     if(FP == NULL)
     {
         // Throw error and exit if fopen() failed
@@ -56,39 +56,69 @@ int main (int argc, char* argv[])
     printf("creating objects...\n");
     instr* input = new instr[1];
     Pipeline pl(1, 4, 4);
+    int cycles = 0;
     while(fscanf(FP, "%lx %d %d %d %d", &pc, &op_type, &dest, &src1, &src2) != EOF)
     {
-        
+        cycles++;
+        printf("Cycle %d\n",cycles);
         printf("%lx %d %d %d %d\n", pc, op_type, dest, src1, src2); //Print to check if inputs have been read correctly
         /*************************************
             Add calls to OOO simulator here
         **************************************/
         printf("setting input values \n");
-        input[0].pc;
+        input[0].pc = pc;
         input[0].op_type = op_type;
         input[0].rd = dest;
         input[0].rs1 = src1;
         input[0].rs2 = src2;
+        input[0].valid = true;
 
-        printf("  retire...\n");
+        //printf("  retire...\n");
         pl.retire();
-        printf("  writeback...\n");
+        //printf("  writeback...\n");
         pl.writeback();
-        printf("  execute...\n");
+        //printf("  execute...\n");
         pl.execute();
-        printf("  issue...\n");
+        //printf("  issue...\n");
         pl.issue();
-        printf("  dispatch...\n");
+        //printf("  dispatch...\n");
         pl.dispatch();
-        printf("  regRead...\n");
+        //printf("  regRead...\n");
         pl.regRead();
-        printf("  rename...\n");
+        //printf("  rename...\n");
         pl.rename();
-        printf("  decode...\n");
+        //printf("  decode...\n");
         pl.decode();
-        printf("  fetch...\n");
+        //printf("  fetch...\n");
         pl.fetch(input);
+    }
 
+    printf("End of File Reached!\n");
+    pl.eof = true;
+
+    while(!pl.finished){
+    	cycles++;
+    	printf("Cycle %d\n",cycles);
+    	input = new instr[1];
+    	input[0].valid = false;
+    	//printf("  retire...\n");
+        pl.retire();
+        //printf("  writeback...\n");
+        pl.writeback();
+        //printf("  execute...\n");
+        pl.execute();
+        //printf("  issue...\n");
+        pl.issue();
+        //printf("  dispatch...\n");
+        pl.dispatch();
+        //printf("  regRead...\n");
+        pl.regRead();
+        //printf("  rename...\n");
+        pl.rename();
+        //printf("  decode...\n");
+        pl.decode();
+        //printf("  fetch...\n");
+        pl.fetch(input);
     }
     return 0;
 }

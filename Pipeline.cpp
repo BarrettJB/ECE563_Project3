@@ -30,7 +30,13 @@ Pipeline::Pipeline(unsigned long int width, unsigned long int iq_size, unsigned 
 	mHead = 0;
 	mTail = 0;
 
+	mDEStall = false;
+	mRNStall = false;
+
 	isTrue = true;
+
+	eof = false;
+	finished = false;
 }
 
 //TODO handle superscalar...
@@ -39,6 +45,10 @@ void Pipeline::retire(){
 		if (mROB[mHead].rdy) {
 			mHead = (mHead + 1) % mROBsize;
 		}
+	}
+	//Pipeline is empty this is finished
+	if (eof && mHead == mTail) {
+		finished = true;
 	}
 }
 
@@ -97,6 +107,10 @@ void Pipeline::execute(){
 void Pipeline::issue() {
 	int k = 0;
 	for(int i = 0; i < mWidth; i++) {
+		//skip if issue queue is empty
+		if (mIQentries == 0){
+			return;
+		}
 		int maxAge = 0;
 		int oldest = 0;
 		//Find the oldest instruction in IQ
@@ -155,6 +169,10 @@ void Pipeline::dispatch() {
 	if(mIQentries+mWidth < mIQsize) {
 		mDEStall = false;
 		for( int i = 0; i < mWidth; i++) {
+			//End the stage if there are no valid instructions left in the pipeline register
+			if (!mDIPR[i].valid){
+				return;
+			}
 			for (int j = 0; j < mIQsize; j++) {
 				if (!mIQ[j].valid) {
 					//Insert instruction into instruction queue
@@ -186,8 +204,8 @@ void Pipeline::dispatch() {
 						mIQ[j].rs2Rdy = &(mROB[mDIPR[i].rs2].rdy);
 					}
 
-					if(mDIPR[i].rs2)
-					break;
+					//End the loop we found a IQ entry for it
+					j = mIQsize;
 				}
 			}
 		}
@@ -217,7 +235,7 @@ void Pipeline::rename() {
 	}
 
 	//If ROB is full stall
-	if (mHead <= (mTail + mWidth) % mROBsize) {
+	if (mWidth >= (mHead - mTail) % mROBsize && (mHead - mTail) % mROBsize != 0) {
 		mRNStall = true;
 		return;
 	}
@@ -226,11 +244,17 @@ void Pipeline::rename() {
 
 	//Allocate spot in ROB
 	for(int i = 0; i < mWidth; i++) {
-		mTail++;
+		//skip if not a valid instruction
+		if(!mRNPR[i].valid) { return;}
+
+		//Place values into the ROB
 		mRNPR[i].robID = mTail;
 		mROB[mTail].dst = mRNPR[i].rd;
 		mROB[mTail].pc = mRNPR[i].pc;
 		mROB[mTail].rdy = false;
+
+		//increment the ROB tail
+		mTail = (mTail + 1) % mROBsize;
 
 		//Rename src registers
 		if(mRMT[mRNPR[i].rs1].valid)
