@@ -62,8 +62,8 @@ typedef struct iq_entry{
 	int age;
 	bool valid;
 	unsigned int dstTag;
-	bool *rs1Rdy;
-	bool *rs2Rdy;
+	bool rs1Rdy;
+	bool rs2Rdy;
 };
 
 typedef struct rmt_entry {
@@ -91,24 +91,30 @@ public:
 	void decode();
 	void fetch(instr* input);
 
+	bool isStalled() {return mDIStall||mRNStall;};
+
 	//Used to end the process once all instructions retire
 	bool eof;
 	bool finished;
 
 	int cycle;
 
+	//Used to stall early processes depending on availability
+	bool mDIStall;
+	bool mRNStall;
+
 private:
 	unsigned long int mWidth;
 	int* mARF;
 	rob_entry* mROB;
 	unsigned int mROBsize;
+	unsigned int mROBentries;
 	unsigned int mHead;
 	unsigned int mTail;
 	iq_entry* mIQ;
 	unsigned int mIQsize;
 	unsigned int mIQentries;
 	rmt_entry* mRMT;
-
 
 	//Pipeline Registers
 	instr* mDEPR;
@@ -119,9 +125,6 @@ private:
 	instr* mWBPR;
 
 
-	//Used to stall early processes depending on availability
-	bool mDIStall;
-	bool mRNStall;
 
 	//Used for wakeup pointers
 	bool isTrue;
