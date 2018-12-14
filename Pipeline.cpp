@@ -30,19 +30,40 @@ Pipeline::Pipeline(unsigned long int width, unsigned long int iq_size, unsigned 
 	mHead = 0;
 	mTail = 0;
 
-	mDEStall = false;
+	mDIStall = false;
 	mRNStall = false;
 
 	isTrue = true;
 
 	eof = false;
 	finished = false;
+
+	cycle = 0;
 }
 
-//TODO handle superscalar...
 void Pipeline::retire(){
+	//update validation cycle counts
+	for(int j = 0; j < mROBsize; j++) {
+		mROB[j].robInstr.rtDur++;
+	}
+	//Retire width ready instructions from the ROB
 	for(int i = 0; i < mWidth; i++) {
 		if (mROB[mHead].rdy) {
+			//Check if the RMT is from this
+			if(mRMT[mROB[mHead].dst].tag == mHead)
+			{
+				mRMT[mROB[mHead].dst].valid = false;
+			}
+
+			//Print out the Validation info
+			//TODO save original src destinations for use here
+			//TODO actually get trace line number
+			instr in = mROB[mHead].robInstr;
+			printf("%d fu{%d} src{%d,%d} dst{%d} FE{%d,%d} DE{%d,%d} RN{%d,%d} RR{%d,%d} DI{%d,%d} IS{%d,%d} EX{%d,%d} WB{%d,%d} RT{%d,%d}\n",
+					in.traceLine, in.op_type, in.rs1Orig, in.rs2Orig, in.rd, in.feEnt, in.feDur, in.deEnt, in.deDur, in.rnEnt, in.rnDur, in.rrEnt,
+					in.rrDur, in.diEnt, in.diDur, in.isEnt, in.isDur, in.exEnt, in.exDur, in.wbEnt, in.wbDur, in.rtEnt, in.rtDur);
+
+			//Move the head pointer
 			mHead = (mHead + 1) % mROBsize;
 		}
 	}
@@ -62,6 +83,10 @@ void Pipeline::writeback(){
 			mROB[mWBPR[i].robID].rdy = true;
 			//Set this request as read
 			mWBPR[i].valid = false;
+			//update validation counts
+			mWBPR[i].rtEnt = cycle + 1;
+			mWBPR[i].wbDur++;
+			mROB[mWBPR[i].robID].robInstr = mWBPR[i];
 		}
 	}
 }
@@ -76,9 +101,14 @@ void Pipeline::execute(){
 		if(!mFU[i].inUse) {break;}
 		//Reduce the necessary cycles left to run
 		mFU[i].cyclesLeft--;
+		//update cycle count for validation
+		mFU[i].fuInstr.exDur++;
 		//if the instruction has finished executing
 		if(mFU[i].cyclesLeft == 0)
 		{
+			//set writeback entrance time
+			mFU[i].fuInstr.wbEnt = cycle + 1;
+
 			//set the fu to available
 			mFU[i].inUse = false;
 
@@ -106,13 +136,22 @@ void Pipeline::execute(){
 
 void Pipeline::issue() {
 	int k = 0;
+	//Update cycle times
+	for(int j = 0; j < mIQsize; j++) {
+		if (mIQ[j].valid)
+		{
+			mIQ[j].iqInstr.isDur++;
+		}
+	}
+
+	//Attempt to issue the oldest instructions
 	for(int i = 0; i < mWidth; i++) {
 		//skip if issue queue is empty
 		if (mIQentries == 0){
 			return;
 		}
 		int maxAge = 0;
-		int oldest = 0;
+		int oldest = -1;
 		//Find the oldest instruction in IQ
 		for(int j = 0; j < mIQsize; j++) {
 			//Only look for valid and ready instructions
@@ -127,6 +166,8 @@ void Pipeline::issue() {
 			}
 		}
 
+		//no instructions are ready for issue
+		if (oldest == -1) { return;	}
 		//Take the oldest ready instruction out of the issue queue
 		mIQ[oldest].valid = false;
 		mIQentries--;
@@ -140,6 +181,7 @@ void Pipeline::issue() {
 				fuFound = true;
 				//Give it the instruction
 				mFU[k].fuInstr = mIQ[oldest].iqInstr;
+				mFU[k].fuInstr.exEnt = cycle + 1;
 				//Set it to used
 				mFU[k].inUse = true;
 				//Set the number of cycles by optype
@@ -167,7 +209,7 @@ void Pipeline::dispatch() {
 	int i = 0;
 	//There are available slots in the issue queue
 	if(mIQentries+mWidth < mIQsize) {
-		mDEStall = false;
+		mDIStall = false;
 		for( int i = 0; i < mWidth; i++) {
 			//End the stage if there are no valid instructions left in the pipeline register
 			if (!mDIPR[i].valid){
@@ -180,6 +222,9 @@ void Pipeline::dispatch() {
 					mIQ[j].valid = true;
 					mIQ[j].age = 1;
 					mIQentries++;
+
+					mIQ[j].iqInstr.isEnt = cycle + 1;
+					mIQ[j].iqInstr.deDur++;
 
 					//Init readiness of values
 					//If the value is in ARF it is ready
@@ -213,24 +258,34 @@ void Pipeline::dispatch() {
 	//If there are no available slots stall the processors early stages
 	else
 	{
-		mDEStall= true;
+		for(int i = 0; i < mWidth; i++) {
+			mDIPR[i].diDur++;
+		}
+		mDIStall= true;
 	}
 }
 
 void Pipeline::regRead() {
-	if(mDEStall) {
-		return;
+	if(mDIStall) {
+		for(int i = 0; i < mWidth; i++) {
+			mRRPR[i].rrDur++;
+		}
 	}
 
 	//Pass along the bundle;
 	for(int i = 0; i < mWidth; i++) {
 		mDIPR[i] = mRRPR[i];
+		mDIPR[i].diEnt = cycle + 1;
+		mDIPR[i].rrDur++;
 	}
 }
 
 void Pipeline::rename() {
 	//If IQ is full stall
-	if(mDEStall) {
+	if(mDIStall) {
+		for(int i = 0; i < mWidth; i++) {
+			mRNPR[i].rnDur++;
+		}
 		return;
 	}
 
@@ -252,6 +307,7 @@ void Pipeline::rename() {
 		mROB[mTail].dst = mRNPR[i].rd;
 		mROB[mTail].pc = mRNPR[i].pc;
 		mROB[mTail].rdy = false;
+		mROB[mTail].robInstr = mRNPR[i];
 
 		//increment the ROB tail
 		mTail = (mTail + 1) % mROBsize;
@@ -281,31 +337,39 @@ void Pipeline::rename() {
 
 		//Update RMT for dest register
 		mRMT[mRNPR[i].rd].tag = mRNPR[i].robID;
+		mRMT[mRNPR[i].rd].valid = true;
 	}
 
 	//Pass along the bundle
 	for(int i = 0; i < mWidth; i++) {
 		mRRPR[i] = mRNPR[i];
+		mRRPR[i].rrEnt = cycle + 1;
+		mRRPR[i].rnDur++;
 	}
 }
 
 void Pipeline::decode() {
-	//Do nothing if stalled
-	if (mDEStall || mRNStall)
+	//Increment cycle times if stalled
+	if (mDIStall || mRNStall)
 	{
+		for(int i = 0; i < mWidth; i++) {
+			mDEPR[i].deDur++;
+		}
 		return;
 	}
 
 	//Otherwise just pass the bundle along
 	for(int i = 0; i < mWidth; i++) {
 		mRNPR[i] = mDEPR[i];
+		mRNPR[i].rnEnt = cycle + 1;
+		mRNPR[i].deDur++;
 	}
 }
 
 //TODO handle bundles that are not full...
 void Pipeline::fetch(instr* input) {
 	//Do nothing if stalled
-	if (mDEStall || mRNStall)
+	if (mDIStall || mRNStall)
 	{
 		return;
 	}
@@ -313,5 +377,10 @@ void Pipeline::fetch(instr* input) {
 	//Pass the bundle along
 	for(int i = 0; i < mWidth; i++) {
 		mDEPR[i] = input[i];
+		mDEPR[i].rs1Orig = input[i].rs1;
+		mDEPR[i].rs2Orig = input[i].rs2;
+		mDEPR[i].feEnt = cycle;
+		mDEPR[i].feDur = 1;
+		mDEPR[i].deEnt = cycle+1;
 	}
 }

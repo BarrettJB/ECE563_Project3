@@ -8,16 +8,43 @@
 #ifndef PIPELINE_H_
 #define PIPELINE_H_
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 typedef struct instr {
 	bool valid;
 	unsigned long int pc;
 	unsigned int op_type;
 	int rd;
-	unsigned int rs1;
+	int rs1;
 	bool rs1ROB;
-	unsigned int rs2;
+	int rs2;
 	bool rs2ROB;
 	unsigned int robID;
+
+	//Used for validation printout;
+	int feEnt;
+	int feDur;
+	int deEnt;
+	int deDur;
+	int rnEnt;
+	int rnDur;
+	int rrEnt;
+	int rrDur;
+	int diEnt;
+	int diDur;
+	int isEnt;
+	int isDur;
+	int exEnt;
+	int exDur;
+	int wbEnt;
+	int wbDur;
+	int rtEnt;
+	int rtDur;
+	int rs1Orig;
+	int rs2Orig;
+	int traceLine;
 };
 
 typedef struct rob_entry{
@@ -27,6 +54,7 @@ typedef struct rob_entry{
 	bool exc;
 	bool miss;
 	unsigned long int pc;
+	instr robInstr;
 };
 
 typedef struct iq_entry{
@@ -67,6 +95,8 @@ public:
 	bool eof;
 	bool finished;
 
+	int cycle;
+
 private:
 	unsigned long int mWidth;
 	int* mARF;
@@ -88,8 +118,9 @@ private:
 	fu* mFU;
 	instr* mWBPR;
 
+
 	//Used to stall early processes depending on availability
-	bool mDEStall;
+	bool mDIStall;
 	bool mRNStall;
 
 	//Used for wakeup pointers

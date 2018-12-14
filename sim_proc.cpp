@@ -56,11 +56,10 @@ int main (int argc, char* argv[])
     printf("creating objects...\n");
     instr* input = new instr[1];
     Pipeline pl(1, 4, 4);
-    int cycles = 0;
+    int traceLine = 0;
     while(fscanf(FP, "%lx %d %d %d %d", &pc, &op_type, &dest, &src1, &src2) != EOF)
     {
-        cycles++;
-        printf("Cycle %d\n",cycles);
+        //printf("Cycle %d\n",pl.cycle);
         printf("%lx %d %d %d %d\n", pc, op_type, dest, src1, src2); //Print to check if inputs have been read correctly
         /*************************************
             Add calls to OOO simulator here
@@ -72,6 +71,8 @@ int main (int argc, char* argv[])
         input[0].rs1 = src1;
         input[0].rs2 = src2;
         input[0].valid = true;
+        input[0].traceLine = traceLine;
+        traceLine++;
 
         //printf("  retire...\n");
         pl.retire();
@@ -88,17 +89,17 @@ int main (int argc, char* argv[])
         //printf("  rename...\n");
         pl.rename();
         //printf("  decode...\n");
-        pl.decode();
+         pl.decode();
         //printf("  fetch...\n");
         pl.fetch(input);
+        pl.cycle++;
     }
 
     printf("End of File Reached!\n");
     pl.eof = true;
 
     while(!pl.finished){
-    	cycles++;
-    	printf("Cycle %d\n",cycles);
+    	//printf("Cycle %d\n",pl.cycle);
     	input = new instr[1];
     	input[0].valid = false;
     	//printf("  retire...\n");
@@ -119,6 +120,7 @@ int main (int argc, char* argv[])
         pl.decode();
         //printf("  fetch...\n");
         pl.fetch(input);
+    	pl.cycle++;
     }
     return 0;
 }
