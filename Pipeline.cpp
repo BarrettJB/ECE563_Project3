@@ -313,7 +313,7 @@ void Pipeline::rename() {
 		mTail = (mTail + 1) % mROBsize;
 
 		//Rename src registers
-		if(mRMT[mRNPR[i].rs1].valid)
+		if(mRNPR[i].rs1 != -1 && mRMT[mRNPR[i].rs1].valid)
 		{
 			//Get the ROB tag from the RMT
 			mRNPR[i].rs1 = mRMT[mRNPR[i].rs1].tag;
@@ -325,7 +325,7 @@ void Pipeline::rename() {
 			mRNPR[i].rs1ROB = false;
 		}
 
-		if(mRMT[mRNPR[i].rs2].valid)
+		if(mRNPR[i].rs2 != -1 && mRMT[mRNPR[i].rs2].valid)
 		{
 			mRNPR[i].rs2 = mRMT[mRNPR[i].rs2].tag;
 			mRNPR[i].rs2ROB = true;
@@ -336,8 +336,11 @@ void Pipeline::rename() {
 		}
 
 		//Update RMT for dest register
-		mRMT[mRNPR[i].rd].tag = mRNPR[i].robID;
-		mRMT[mRNPR[i].rd].valid = true;
+		if (mRNPR[i].rd != -1)
+		{
+			mRMT[mRNPR[i].rd].tag = mRNPR[i].robID;
+			mRMT[mRNPR[i].rd].valid = true;
+		}
 	}
 
 	//Pass along the bundle
