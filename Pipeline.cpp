@@ -9,7 +9,7 @@
 
 Pipeline::Pipeline(unsigned long int width, unsigned long int iq_size, unsigned long int rob_size) {
 	mWidth = width;
-	mARF = new int[67];
+	mARF = new int[67];  //TODO
 
 	mROBsize = rob_size;
 	mROBentries = 0;
@@ -262,9 +262,20 @@ void Pipeline::issue() {
 }
 
 void Pipeline::dispatch() {
-	//There are available slots in the issue queue
-	if(mIQentries+mWidth <= mIQsize) {
+	//Issue queue does not have enough slots open, need to stall
+	if(mIQentries + mWidth > mIQsize)
+	{
+		mDIStall = true;
+
+		for(int i = 0; i < mWidth; i++) {
+			mDIPR[i].diDur++;
+		}
+		return;
+	}
+	else
+	{
 		mDIStall = false;
+
 		for( int i = 0; i < mWidth; i++) {
 			//End the stage if there are no valid instructions left in the pipeline register
 			if (!mDIPR[i].valid){
@@ -325,14 +336,6 @@ void Pipeline::dispatch() {
 			}
 		}
 	}
-	//If there are no available slots stall the processors early stages
-	else
-	{
-		for(int i = 0; i < mWidth; i++) {
-			mDIPR[i].diDur++;
-		}
-		mDIStall= true;
-	}
 }
 
 void Pipeline::regRead() {
@@ -353,7 +356,14 @@ void Pipeline::regRead() {
 }
 
 void Pipeline::rename() {
-	//If IQ is full stall
+
+	if (mROBentries + mWidth <= mROBsize)
+	{
+		//No longer stalled
+		mRNStall = false;
+	}
+
+	//If we are stalled
 	if(mDIStall) {
 		for(int i = 0; i < mWidth; i++) {
 			mRNPR[i].rnDur++;
@@ -365,17 +375,17 @@ void Pipeline::rename() {
 	if (mROBentries + mWidth > mROBsize) {
 		mRNStall = true;
 		for(int i = 0; i < mWidth; i++) {
-			mRNPR[i].rnDur++;
-		}
-
-		for(int i = 0; i < mWidth; i++) {
 			mRRPR[i].valid = false;
+		}
+	}
+
+	//If we are stalled
+	if(mRNStall) {
+		for(int i = 0; i < mWidth; i++) {
+			mRNPR[i].rnDur++;
 		}
 		return;
 	}
-
-	//No longer stalled
-	mRNStall = false;
 
 	//Allocate spot in ROB
 	for(int i = 0; i < mWidth; i++) {
