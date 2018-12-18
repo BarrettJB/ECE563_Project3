@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "sim_proc.h"
-#include "pipeline.h"
+#include "Pipeline.h"
 
 /*  argc holds the number of command line arguments
     argv[] holds the commands themselves
@@ -62,14 +62,12 @@ int main (int argc, char* argv[])
 	//Run until the pipeline has finished
 	while(!pl.finished)
 	{
-		printf("\n#### CYCLE: %d ###\n",pl.cycle);
 		//if file is empty or proccessor is stalled we need to send empty inputs
 		for (int i = 0; i < params.width; i++) {
 
 			//On stall don't update instruction
 			if(pl.isStalled()) {
 				//On stall don't update instruction
-				printf("Stalled by RN: %d or DI: %d\n", pl.mRNStall, pl.mDIStall);
 			}
 			else
 			{
@@ -89,7 +87,7 @@ int main (int argc, char* argv[])
 					//If file had instruction load it into the input
 					else {
 						//printf("%lx %d %d %d %d\n", pc, op_type, dest, src1, src2); //Print to check if inputs have been read correctly
-						printf("Read in line: %d \n", traceLine);
+						//printf("Read in line: %d \n", traceLine);
 						input[i].pc = pc;
 						input[i].op_type = op_type;
 						input[i].rd = dest;
